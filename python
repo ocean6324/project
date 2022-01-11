@@ -1,0 +1,104 @@
+#!/usr/local/bin/python3
+# -*- coding: UTF-8 -*-
+
+# 添加GI处理模块
+import cgi, cgitb 
+import cx_Oracle
+from HTMLTable import (
+    HTMLTable,
+)
+
+
+# 创建FieldStorage的实例化
+form = cgi.FieldStorage() 
+#获取html页面传递过来的数据值
+
+#str_NAME  =  form.getvalue('NAME')
+#connection = cx_Oracle.connect('system/root123@192.168.0.92/orcl.168.0.92')
+#cursor = connection.cursor()
+
+#sql=("select ID from table1 where NAME ='" + str_NAME  +"'" )
+
+#cursor.execute(sql)
+#for cur in cursor.execute(sql):
+#        user = (cur[0])
+#connection.commit()
+
+
+def htmlTop():
+	print ("""Content-type:text/html\n\n
+		  <!DOCTYPE html>
+		  <html lang="en">
+			<head>
+				<head>
+					<meta charset="utf-8"/>
+					<title>POST</title>
+			</head>
+			<body>""")
+def htmlTail():
+	print ("""</body>
+		</html>""")
+
+def connectDB():
+	#db = cx_Oracle.connect('system/root123@192.168.0.92/orcl.168.0.92')
+	db = cx_Oracle.connect('system/root123@192.168.0.43/orcl.168.0.43')
+	cursor = db.cursor()
+	return db,cursor
+
+def selectID(db,cursor):
+	str_Name  =  form.getvalue('NAME')
+	sql = ("select ID from table1 where NAME ='" + str_Name  +"'" )
+	cursor.execute(sql)
+	
+	for id in cursor.execute(sql):
+		userid = ( id[0] )
+	return str_Name,userid
+
+def displayID(str_Name,userid):
+	print ("<table border='5'>")
+	print ("<tr>")
+	print ("<td style='color:blue;'>NAME</td>")
+	print ("<td style='color:blue;'>ID</td>")
+	print ("</tr>")
+	print ("<tr>")
+	print ("<td>%s</td>" %(str_Name))
+	print ("<td>%s</td>" %(userid))
+	print ("</tr>")
+	print ("</table>")
+	
+
+if __name__== "__main__":
+	try:
+		htmlTop()
+		db,cursor = connectDB()
+		str_Name,userid = selectID(db,cursor)
+		cursor.close()
+		displayID(str_Name,userid)
+		htmlTail()
+	except:
+		cgi.print_exception()
+
+
+#打印输出
+#print ("Content-type:text/html")
+#print ("")
+#print ("<html>")
+#print ("<head>")
+#print ("<meta charset=\"utf-8\">")
+#print ("<title>POST</title>")
+#print ("</head>")
+#print ("<body>")
+#print ("<table border='5'>")
+##print ("<h2>data_1:%s</h2>" % (user))
+#print ("<tr>")
+#print ("<td style='color:blue;'>NAME</td>")
+#print ("<td style='color:blue;'>ID</td>")
+#print ("</tr>")
+#print ("<tr>")
+#print ("<td>%s</td>" %(str_NAME))
+#print ("<td>%s</td>" %(user))
+#print ("</tr>")
+#print ("</table>")
+#print ("</body>")
+#print ("</html>")
+
