@@ -1,0 +1,497 @@
+#!/bin/bash
+#echo total "total $#"
+#echo "test $1"
+#echo "---------------------------------------------"
+
+Cluster='192.168.1.110'
+Vserver='SVM1'
+#project_volume='rdp' <============Production
+project_volume='ocean_test'
+#project_volume='rdp'
+policy_name='quota_policy'
+
+function K-M-G(){
+	#echo "----------$1--------"
+        Utmp=`echo "$1" | grep B$ | wc -l`
+        if [ $Utmp -eq "1" ];then
+                Unit='B'
+        fi
+
+        Utmp=`echo "$1" | grep K$ | wc -l`
+        if [ $Utmp -eq "1" ];then
+                Unit='K'
+        fi
+
+        Utmp=`echo "$1" | grep M$ | wc -l`
+        if [ $Utmp -eq "1" ];then
+                Unit='M'
+        fi
+
+        Utmp=`echo "$1" | grep G$ | wc -l` 
+        if [ $Utmp -eq "1" ];then
+                Unit='G'
+        fi
+        
+	quota_tmp=`echo "$1" | sed -e s:"$Unit"::g`
+
+        K=1024
+        M=$(($K*1024))
+        G=$(($M*1024))
+
+
+case $Unit in
+K)
+        size="$(echo "scale=0; $quota_tmp*$K/1"|bc)"
+        ;;
+M)
+        size="$(echo "scale=0; $quota_tmp*$M/1"|bc)"
+        ;;
+G)
+        size="$(echo "scale=0; $quota_tmp*$G/1"|bc)"
+        ;;
+B)
+        size=$quota_tmp
+        ;;
+*)
+        size=$quota_tmp
+        ;;
+esac
+
+
+}
+
+function chk_home_Dir(){
+	#echo $1
+	#echo $2
+	#echo $3
+	cmd="quota report -volume $1 -quota-type user -quota-target $2 -fields volume ,disk-used,disk-limit,quota-target"
+	ssh monitor@$Cluster $cmd > /dev/null
+	Error=$?
+	#echo $Error
+	if [ $Error -eq 0 ]; then
+		printf "%-20s\n" "=================Volume $1 User $2 Quota Information================="
+		ssh monitor@$Cluster $cmd |awk '{printf "%-20s %-20s %-20s %-20s\n",$2,$4,$5,$6}'
+		printf "%-20s\n" "========================================================================="
+	else
+		printf "%-20s\n" "There is no User $2 in Volume $1  !!!!!!!!!!!!!!!"
+	fi
+}
+
+function chk_user_quota_rule(){
+	#echo $1
+	#echo $2
+	#echo $3
+	cmd="quota policy rule show -volume $1  -type user -target $2"
+	cmd1="quota policy rule create -policy-name quota_policy -volume $1 -type user -target $2 -disk-limit $3 -qtree \"\""
+	cmd2="quota resize -volume $1"
+	cmd3="quota policy rule modify -policy-name quota_policy -volume $1 -type user -target $2 -qtree \"\" -disk-limit $3"
+	cmd4="quota report -volume $1 -quota-type user -quota-target $2 -fields volume ,disk-used,disk-limit,quota-target"
+	ssh monitor@$Cluster $cmd > /dev/null
+	Error=$?
+	#echo $Error
+	if [ $Error -eq 0 ]; then
+		#echo "gogo"
+		ssh monitor@$Cluster $cmd3 > /dev/null
+		ssh monitor@$Cluster $cmd2 > /dev/null
+		sleep 3s
+		printf "%-20s\n" "==================User $2 Quota Size================================="
+		ssh monitor@$Cluster $cmd4 |awk '{printf "%-20s %-20s %-20s %-20s\n",$2,$4,$5,$6}'
+		printf "%-20s\n" "==============================================================================="
+	else
+		#echo $cmd1
+		ssh monitor@$Cluster $cmd1 > /dev/null
+		ssh monitor@$Cluster $cmd2 > /dev/null
+		sleep 3s
+		printf "%-20s\n" "==================User $2 Quota Size================================="
+		ssh monitor@$Cluster $cmd4 |awk '{printf "%-20s %-20s %-20s %-20s\n",$2,$4,$5,$6}'
+		printf "%-20s\n" "==============================================================================="
+			
+	fi
+
+
+
+}
+
+function chk_project_quota_rule(){
+	#echo $1
+	#echo $2
+	#echo $3
+	cmd="quota policy rule show -vserver SVM1 -policy-name quota_policy -volume $1 -target $2"
+	cmd1="quota policy rule create -policy-name quota_policy -volume $1 -type tree -target $2 -disk-limit $3"
+	cmd2="quota  resize -volume $1"
+	cmd3="quota policy rule modify -policy-name quota_policy -volume $1 -type tree -target $2 -disk-limit $3"
+	cmd4="quota report -volume $1 -tree $2 -fields volume,tree,disk-limit,disk-used"
+	ssh monitor@$Cluster $cmd > /dev/null
+	Error=$?
+	#echo $Error
+	if [ $Error -eq 0 ] ;then
+		#echo "gogo"
+		ssh monitor@$Cluster $cmd3 > /dev/null
+		ssh monitor@$Cluster $cmd2 > /dev/null
+		sleep 3s
+		#echo "==================Project $2 Size================================="
+		printf "%-20s\n" "==================Project $2 Size================================="
+		ssh monitor@$Cluster $cmd4 | awk '{printf  "%-20s %-20s %-20s %-20s\n",$2,$4,$5,$6}'
+		#echo "=========================================================================="
+		printf "%-20s\n" "=========================================================================="
+		
+	else
+		ssh monitor@$Cluster $cmd1 > /dev/null
+		ssh monitor@$Cluster $cmd2 > /dev/null
+		sleep 3s
+		echo "==================Project $2 Size========================="
+		ssh monitor@$Cluster $cmd4 | awk '{printf "%-20s %-20s %-20s %-20s\n",$2,$4,$5,$6}'
+		echo "==============================================================================="
+		
+	fi
+}
+function add_user_quota(){
+	#echo $1
+	#echo $2
+	#echo $3
+	cmd="quota report -volume $1 -quota-type user -quota-target $2 -fields volume ,disk-used,disk-limit,quota-target"
+	ssh monitor@$Cluster $cmd > /dev/null
+	Error=$?
+	#echo $Error
+	if [ $Error -eq 0 ]; then
+		#echo "GoGo"
+		U_default_quota_v1=`chk_home_Dir $1 $2 |awk 'NR==4 {print $4}' | tr '[:lower:]' '[:upper:]'`
+		#echo "U_default_quota_v1 $U_default_quota_v1"
+		K-M-G $U_default_quota_v1
+		K-M-G $size
+		U_default_quota=$size
+		#echo "U_default_quota $U_default_quota"
+		input_size_v1=`echo $3 |tr '[:lower:]' '[:upper:]'`
+		K-M-G $input_size_v1
+		input_size=$size
+		#echo "input_size $input_size"
+		if [ $input_size -lt $U_default_quota ] ; then
+			printf "%-20s\n" "Input_size Small Default Quota Size!!!"
+			printf "%-20s\n" "User $2 Default Size $U_default_quota_v1 && Input_size is $input_size_v1!!!!"
+		else
+			#echo "gogo"
+			chk_user_quota_rule $1 $2 $3
+		fi
+	else
+		#echo "Not Go Go"
+		printf "%-20s\n" "There is no User $2 in Volume $1  !!!!!!!!!!!!!!!"
+	fi
+}
+
+function add_project_quota(){
+        #echo $1
+	#echo $2
+	#echo $3
+	cmd="quota report -volume $1 -tree $2  -fields volume ,tree ,disk-used,disk-limit"
+	if [ -z $1 ]||[ -z $2 ]||[ -z $3 ]; then
+		Usage1 
+	else
+		ssh monitor@$Cluster $cmd > /dev/null
+		Error=$?
+		#echo $Error
+		if [ $Error -eq 0 ]; then
+			#echo "gogo"
+			P_default_quota_v1=`chk_Proj_Quota $1 $2 |awk 'NR==4 {print $4}'|tr '[:lower:]' '[:upper:]'`
+			#echo "P_default_quota_v1 $P_default_quota_v1"
+			K-M-G $P_default_quota_v1
+			K-M-G $size
+			P_default_quota=$size
+			#echo "P_default_quota  $size "
+			input_size_v1=`echo $3 |tr '[:lower:]' '[:upper:]'`
+			#echo $input_size_v1
+			K-M-G $input_size_v1
+			input_size=$size
+			#echo "input_size $input_size"
+			
+			if [ $input_size -lt $P_default_quota ] ; then
+				#echo "Input_size Small Default Quota Size!!!"
+				printf "%-20s\n" "Input_size Small Default Quota Size!!!"
+				#echo "Project $2 Default Size $P_default_quota_v1 && Input_size is $input_size_v1!!!!"
+				printf "%-20s\n" "Project $2 Default Size $P_default_quota_v1 && Input_size is $input_size_v1!!!!"
+			else
+				chk_project_quota_rule $1 $2 $3
+			fi
+			
+		else
+			#echo "nono"
+			#echo " There is no Project Volume $1 Project $2 Information"
+			printf "%-20s\n" " There is no Project Volume $1 Project $2 Information"
+		fi
+	fi
+}
+
+function chk_Proj_Quota(){
+		
+		#echo $1
+		#echo $2
+		cmd=" quota report -volume $1 -tree $2  -fields volume ,tree ,disk-used,disk-limit"
+		ssh monitor@$Cluster $cmd > /dev/null 
+		Error=$?
+		#echo $Error
+		if [ $Error -eq 0 ]; then
+			#echo "=================Project $2 Quota used============================="
+			printf "%-20s\n"  "=================Project $2 Quota used==========================="
+			ssh monitor@$Cluster $cmd |awk '{printf "%-20s %-20s %-20s %-20s\n",$2,$4,$5,$6}'
+			#echo "========================================================================="
+			printf "%-20s\n"  "========================================================================="
+			#echo "gogo"
+		else
+			#echo "no go"
+			echo " There is no volume $1  Project $2 Information!!!!!!"
+		fi
+}
+
+function chk_vol(){
+		#echo $1
+		#echo $2 
+		cmd="vol show -volume $1 -field used,total,available"
+		ssh monitor@$Cluster $cmd > /dev/null
+		Error=$?
+		#echo $Error
+		if [ $Error -eq 0 ]; then
+		#echo "=========================Volume Information========================================="
+		printf "%-20s\n" "=========================Volume Information========================================="
+		ssh monitor@$Cluster $cmd |awk '{printf "%-20s %-20s %-20s %-20s\n",$2,$3,$4,$5}'
+		#echo "=========================Aggr   Information========================================="
+		printf "%-20s\n"  "=========================Aggr   Information========================================="
+		cmd1="vol show -volume $1 -fields aggregate"
+		vol_aggr=`ssh monitor@$Cluster $cmd1 |awk 'NR==3 {print $3}'`
+		#echo $vol_aggr
+		cmd3="aggr show -aggregate $vol_aggr -fields size,usedsize,availsize"
+		ssh monitor@$Cluster $cmd3 |awk '{printf "%-20s %-20s %-20s %-20s\n",$1,$2,$3,$4}'
+		else
+		#echo "There is no volume exit!!!!!!"
+		printf "%-20s\n" "There is no volume exit!!!!!!"
+		fi
+}
+
+function add_vol_size(){
+
+		#echo $1
+		#echo $2
+		cmd="vol show -volume $1 -field used,total,available"
+		cmd2="vol show -volume $1 -field used,total,available"
+		ssh monitor@$Cluster $cmd > /dev/null
+		Error=$?
+		#echo $Error
+		if [ $Error -eq 0 ]; then
+			input_size=`echo $2 |tr '[:lower:]' '[:upper:]'`
+			K-M-G $input_size
+			input_size=$size
+			#echo "input_size=$input_size"
+			av_size $1
+			volsize=$size
+			#echo "volsize =$volsize"
+			total_size=(`expr $input_size + $volsize`)
+			#echo "total_size=$total_size"
+			if [ $total_size -le $volsize ]; then
+				echo "Input Size Too Small !!!!!!!!!"
+			else
+				cmd1="vol size -volume $1 -new-size +$2"
+				ssh monitor@$Cluster $cmd1 > /dev/null
+				#echo " Volume $1 resize Complete !!!!!!!!!"
+				printf "%-20s\n" " Volume $1 resize Complete !!!!!!!!!"
+				#echo "=========================Volume $1 Information========================================="
+				printf "%-20s\n"  "=========================Volume $1 Information========================================="
+				ssh monitor@$Cluster $cmd2 |awk '{printf "%-20s %-20s %-20s %-20s\n",$2,$3,$4,$5}'
+				#echo "==============================================================================================="
+				printf "%-20s\n" "==============================================================================================="
+			fi
+		else
+			#echo "There is no volume $1 exit!!!!!!"
+			printf "%-20s\n" "There is no volume $1 exit!!!!!!"
+		fi
+
+}
+
+
+function default_size(){
+
+
+	cmd="quota report -vserver SVM1 -volume $project_volume -fields tree,disk-limit -tree $1"
+#	echo $cmd
+	na_size=`ssh monitor@$Cluster $cmd  | awk 'NR==3 {print $5}'`
+#	echo $na_size
+
+
+	na_default=`echo "$na_size" | sed -e s:B::g`
+#	echo $na_default
+	
+}
+
+
+function av_size(){
+	
+	cmd="set d ; set -units B ; vol show -volume $1 -field used,total,available"
+	av_size_default=`ssh monitor@$Cluster $cmd | awk 'NR==5 {print $5}'`
+	#echo $av_size_default
+	K-M-G $av_size_default
+	#echo $size
+	
+}
+
+
+
+function Usage(){
+        echo " Usage :"
+        echo " +==================================================================================================+"
+        echo " | NA Function  List                                                                                |"
+        echo " |--------------------------------------------------------------------------------------------------|"
+	echo " |  -Pql rdp (Project Volume)PP9999AA(Project Name)               query Project quota               |"
+        echo " |  -aPq PP9999AA(Project Name) 400g(Size)                        resize Project                    |"
+	echo " |  -Uql rdp (User Volume)ocean(User Name)                        query User quota (For RD User)    |"
+	echo " |  -aUq rdp (User Volume)ocean(User Name) 10g(Size)              resize User quota(For RD User)    |"
+	echo " |   -vl volume(Volume Name)                                      check Volume locat aggr size      |"
+	echo " |   -av volume (Volume Name)  10g(Size)                          resize Volume Size                |"
+        echo " +==================================================================================================+"
+}
+
+function Usage1(){
+        echo " Usage :"
+        echo " +=============================================================+"
+        echo " |Input  format                                                |" 	     
+        echo " |-------------------------------------------------------------|"
+        echo " |ex. resize -u rd1(na_volume) ocean(user_name) 100g(Size)     |"
+        echo " +=============================================================+"
+}
+function Usage2(){
+        echo " Usage :"
+        echo " +=====================================================================================+"
+        echo " |Input format                                                                         |"	     
+        echo " |-------------------------------------------------------------------------------------|"
+	echo " |ex. na_function.sh -aPq  rdp (Project volume)  PP9999AA (Project Name)  400g(Size)   |"
+        echo " +=====================================================================================+"
+}
+function Usage3(){
+        echo " Usage :"
+        echo " +=============================================================+"
+        echo " |Input Size smail or equal NA_Quota_Size                      |"	     
+        echo " |-------------------------------------------------------------|"
+        echo " +=============================================================+"
+}
+function Usage4(){
+	echo " Usage :"
+	echo " +=============================================================+"
+	echo " | Failed there is no home folder!!!!                          |"
+	echo " +=============================================================+"
+}
+function Usage5(){
+	echo " Usage :"
+	echo " +=============================================================+"
+	echo " |Input format                                                 |"
+	echo " |-------------------------------------------------------------|"
+	echo " |ex. na_function.sh -vl (Volume Name)                         |"
+	echo " +=============================================================="
+}
+function Usage6(){
+	echo " Usage :"
+	echo " +=============================================================+"
+	echo " |Input format                                                 |"
+	echo " |-------------------------------------------------------------|"
+	echo " |ex. na_function.sh -av aa(Volume Name) 10g(Size)             |"
+	echo " +=============================================================+" 	
+}
+function Usage7(){
+	echo " Usage :"
+	echo " +===================================================================+"
+	echo " |Input format                                                       |"
+	echo " |-------------------------------------------------------------------|"
+	echo " |ex. na_function.sh -Pql rdp (Project Volume)PP9999AA(Project Name) |"
+	echo " +===================================================================+"
+}
+
+function Usage8(){
+        echo " Usage :"
+        echo " +=============================================================+"
+        echo " |Input  format                                                |" 	     
+        echo " |-------------------------------------------------------------|"
+        echo " |ex. na_function.sh -Uql  rd1(User volume) ocean(user_name)   |"
+        echo " +=============================================================+"
+}
+
+function Usage9(){
+        echo " Usage :"
+        echo " +=======================================================================+"
+        echo " |Input  format                                                          |" 	     
+        echo " |-----------------------------------------------------------------------|"
+        echo " |ex. na_function.sh -aUq  rd1(User volume) ocean(user_name) 10G (Size)  |"
+        echo " +=======================================================================+"
+}
+Na_tree=$1
+#project_name=$2
+#=$3
+
+case $Na_tree in
+
+-Pql)
+	
+	if [ -z $2 ] || [ -z $3 ]; then
+		Usage7
+	else
+		chk_Proj_Quota $2 $3	
+	fi
+
+;;
+
+-aPq)
+
+#	chk_project_Dir $2 $3
+	if [ -z $2 ]||[ -z $3 ]||[ -z $4 ]; then
+		Usage2
+	else
+		add_project_quota $2 $3 $4
+	fi
+
+	
+#	echo "-p"   
+;;
+
+
+-Uql)	
+#	chk_home_Dir $2 $3 
+	if [ -z $2 ] || [ -z $3 ] ; then
+		Usage8
+		#echo "null"
+	else
+		chk_home_Dir $2 $3
+		#echo "not null"
+	fi
+	
+	#echo " -Uql"
+
+;;
+
+-aUq)
+	if [ -z $2 ] || [ -z $3 ] || [ -z $4 ]; then
+		#echo "null"
+		Usage9
+	else
+		#echo "not null"
+		add_user_quota $2 $3 $4
+	fi
+;;
+
+-vl)
+	if [ -z $2 ] ; then
+		Usage5
+	else
+		chk_vol $2 
+	fi
+
+	#echo "-vl"
+;;
+
+-av)
+	if [ -z $2 ] || [ -z $3 ];then
+		Usage6
+	else
+		add_vol_size $2 $3	
+	#echo "-av"
+	fi
+;;
+
+*)
+        Usage
+;;
+esac
+
