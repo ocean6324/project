@@ -1,0 +1,50 @@
+===============================================================================================================
+Python API NetApp 學習
+抓取 cluster 詳細資訊
+
+import json
+import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+rep=requests.get("https://192.168.1.63/api/datacenter/cluster/clusters",auth=("admin","admin123"),verify=False)
+
+查詢回傳值是否正常
+rep.status_code
+200
+
+查詢dict 資料
+res_cluster=rep.json()
+>>> res_cluster['records'][1]
+{'key': '3c2dc456-de63-11e8-b845-00a0986d12fb:type=cluster,uuid=3c2dc456-de63-11e8-b845-00a0986d12fb', 'name': 'fas2750', 'uuid': '3c2dc456-de63-11e8-b845-00a0986d12fb', 'contact': None, 'location': None, 'version': {'full': 'NetApp Release 9.4P4: Thu Nov 01 15:18:22 UTC 2018', 'generation': 9, 'major': 4, 'minor': 0}, 'isSanOptimized': False, 'management_ip': '192.168.1.110', 'nodes': [{'key': '3c2dc456-de63-11e8-b845-00a0986d12fb:type=cluster_node,uuid=ddcbecb5-4659-11e9-988f-00a098fcfc82', 'uuid': 'ddcbecb5-4659-11e9-988f-00a098fcfc82', 'name': 'fas2750-02', '_links': {'self': {'href': '/api/datacenter/cluster/nodes/3c2dc456-de63-11e8-b845-00a0986d12fb:type=cluster_node,uuid=ddcbecb5-4659-11e9-988f-00a098fcfc82'}}, 'location': None, 'version': {'full': 'NetApp Release 9.4P4: Thu Nov 01 15:18:22 UTC 2018', 'generation': 9, 'major': 4, 'minor': 0}, 'model': 'FAS2750', 'uptime': 11754608, 'serial_number': '941911000073'}, {'key': '3c2dc456-de63-11e8-b845-00a0986d12fb:type=cluster_node,uuid=deffa04d-4659-11e9-b093-00a098fcffc6', 'uuid': 'deffa04d-4659-11e9-b093-00a098fcffc6', 'name': 'fas2750-01', '_links': {'self': {'href': '/api/datacenter/cluster/nodes/3c2dc456-de63-11e8-b845-00a0986d12fb:type=cluster_node,uuid=deffa04d-4659-11e9-b093-00a098fcffc6'}}, 'location': None, 'version': {'full': 'NetApp Release 9.4P4: Thu Nov 01 15:18:22 UTC 2018', 'generation': 9, 'major': 4, 'minor': 0}, 'model': 'FAS2750', 'uptime': 11754617, 'serial_number': '941911000072'}], 'storage_capacity': {'used': 551149302398976, 'total': 576968960983040, 'available': 25819658584064}, '_links': {'self': {'href': '/api/datacenter/cluster/clusters/3c2dc456-de63-11e8-b845-00a0986d12fb:type=cluster,uuid=3c2dc456-de63-11e8-b845-00a0986d12fb'}}}
+
+
+>>> res_cluster['records'][1]['management_ip']
+'192.168.1.110'
+
+
+
+===============================================================================================================================
+
+
+""
+
+
+
+
+rep_vol=requests.get("https://192.168.1.63/api/datacenter/storage/volumes",auth=("admin","admin123"),verify=False)
+rep_clu_vol=rep_vol.json()
+
+
+
+
+commvault
+
+rep=requests.get
+
+
+requests.get("https://fp-cvcs.fitipower.inc/webconsole/sandbox/apiexplorer/",auth=("admin","JEJ@dmin6220"),verify=False)
+
+https://fp-cvcs.fitipower.inc/webconsole/sandbox/apiexplorer/
+https://fp-cvcs.fitipower.inc/adminconsole/api/cr/reportsplusengine/datasets/2638c3d3-adc7-4b61-bb24-2ba509229bf5:a30bd278-c7d9-470f-9ae9-8b4922743330/data/?cacheId=9da4a454-4236-477e-c8e2-1e672d1904da&offset=0&orderby=%5BJobId%5D%20Desc&isExport=false&componentName=Job%20Details&parameter.Clients=3&parameter.Agents=Linux%20File%20System&parameter.JobType=Full&parameter.JobType=Incremental&parameter.JobStatus=Completed&parameter.timeframe=2021-05-31T16%3A00%3A04Z%202021-06-22T04%3A00%3A04Z&parameter.useCSTimeZone=1&parameter.WindowStartTime=00%3A00%3A00&parameter.SubClients=54&parameter.datasource=2&limit=20&rawData=false
